@@ -125,7 +125,7 @@ void app_main(void)
     // 配置为下降沿触发中断
     gpio_set_intr_type(IMU_INT_PINNUM, GPIO_INTR_POSEDGE);
     // 使能中断
-    // gpio_intr_enable(IMU_INT_PINNUM);
+    gpio_intr_enable(IMU_INT_PINNUM);
     Init_icm42688();
     /*LSB设置*/
 	LSB_ACC_GYRO[0] = LSB_ACC_16G;
