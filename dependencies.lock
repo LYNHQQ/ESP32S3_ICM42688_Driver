@@ -29,6 +29,6 @@ dependencies:
     version: 5.4.1
 direct_dependencies:
 - espressif/spi_bus
-manifest_hash: 1a4919f84287ddae95c2727b7bd4fe674f8015f48b0755f42cc949553278cb68
+manifest_hash: 485e684665365ac337a407a7f13bae0b59c296f1caf38ff118fb4161331aa4a8
 target: esp32s3
 version: 2.0.0

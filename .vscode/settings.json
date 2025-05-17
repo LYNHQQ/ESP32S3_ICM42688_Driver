@@ -6,6 +6,8 @@
   "idf.flashType": "UART",
   "idf.portWin": "COM3",
   "files.associations": {
-    "spi_bus.h": "c"
+    "spi_bus.h": "c",
+    "spi.h": "c",
+    "esp_timer.h": "c"
   }
 }
