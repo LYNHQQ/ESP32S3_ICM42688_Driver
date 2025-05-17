@@ -20,20 +20,16 @@ float gyro_dps[3] = {0};
 float temp_degc = 0;
 void app_main(void)
 {
-    if(0x00==setup_imu(1,1,1))
-    {
+    if(!setup_imu(1,1,1))
         printf("IMU setup done\n");
-    }
     else
-    {
         printf("IMU setup failed\n");
-    }
     while(1)
     {
         vTaskDelay(pdMS_TO_TICKS(1));
         bsp_IcmGetRawData(accel_mg, gyro_dps,&temp_degc);
-        printf("accel_mg: %f %f %f\n", accel_mg[0], accel_mg[1], accel_mg[2]);
+        // printf("accel_mg: %f %f %f\n", accel_mg[0], accel_mg[1], accel_mg[2]);
         // printf("gyro_dps: %f %f %f\n", gyro_dps[0], gyro_dps[1], gyro_dps[2]);
-        // printf("temp_degc: %f\n", temp_degc);
+        printf("temp_degc: %f\n", temp_degc);
     }
 }

@@ -1,1 +1,44 @@
-/build
+# Build directory
+build/
+
+# ESP-IDF temporary files
+sdkconfig
+sdkconfig.old
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Build generated files
+*.o
+*.d
+*.a
+*.bin
+*.elf
+*.map
+*.hex
+*.list
+*.sym
+
+# Dependencies
+managed_components/
+dependencies.lock
+
+# Log files
+*.log
+
+# Debug files
+*.dmp
+*.trc
+
+# Temporary files
+*.tmp
+*~
+
+# Binary files
+*.bin
+*.elf
+*.map
+*.hex

@@ -6,6 +6,10 @@
 spi_bus_device_handle_t spi_device_handle = NULL;
 static inv_imu_device_t  imu_dev; /* Driver structure */
 
+#define SPI_BUFFER_SIZE 128
+static uint8_t tx_buffer[SPI_BUFFER_SIZE];
+static uint8_t rx_buffer[SPI_BUFFER_SIZE];
+
 int si_print_error_if_any(int rc);
 #define SI_CHECK_RC(rc)                                                                            \
 	do {                                                                                           \
@@ -64,50 +68,41 @@ static void init_spi(void)
     spi_device_handle = spi_bus_device_create(spi_bus_handle, &device_conf);
 }
 
+// 修改读取函数
 static IRAM_ATTR int icm45686_read_regs(uint8_t reg, uint8_t* buf, uint32_t len)
 {
-    if (!buf || !len) return -1;
-    
-    // 使用柔性数组在栈上分配内存
-    struct {
-        uint8_t cmd;           // 寄存器地址
-        uint8_t data[0];       // 柔性数组成员
-    } *tx = alloca(sizeof(*tx) + len);
-    
-    struct {
-        uint8_t dummy;         // 读取时的虚拟字节
-        uint8_t data[0];       // 柔性数组成员
-    } *rx = alloca(sizeof(*rx) + len);
+    if (!buf || !len || (len + 1) > SPI_BUFFER_SIZE) {
+		printf("Error: Invalid buffer or length\n");
+        return -1;
+    }
     
     // 设置读取命令
-    tx->cmd = reg | 0x80;     // 读操作时最高位置1
-    memset(tx->data, 0xFF, len);  // 读取时发送0xFF
+    tx_buffer[0] = reg | 0x80;     // 读操作时最高位置1
+    memset(&tx_buffer[1], 0xFF, len);  // 读取时发送0xFF
     
     // 执行SPI传输
-    spi_bus_transfer_bytes(spi_device_handle, (uint8_t*)tx, (uint8_t*)rx, len + 1);
+    spi_bus_transfer_bytes(spi_device_handle, tx_buffer, rx_buffer, len + 1);
     
     // 复制接收到的数据(跳过第一个命令字节)
-    memcpy(buf, rx->data, len);
+    memcpy(buf, &rx_buffer[1], len);
     
     return 0;
 }
 
+// 修改写入函数
 static IRAM_ATTR int icm45686_write_regs(uint8_t reg, const uint8_t* buf, uint32_t len)
 {
-    if (!buf || !len) return -1;
-    
-    // 使用柔性数组在栈上分配内存
-    struct {
-        uint8_t cmd;           // 寄存器地址
-        uint8_t data[0];       // 柔性数组成员
-    } *tx = alloca(sizeof(*tx) + len);
+    if (!buf || !len || (len + 1) > SPI_BUFFER_SIZE) {
+		printf("Error: Invalid buffer or length\n");
+        return -1;
+    }
     
     // 设置写入命令和数据
-    tx->cmd = reg & 0x7F;     // 写操作时最高位清0
-    memcpy(tx->data, buf, len);
+    tx_buffer[0] = reg & 0x7F;     // 写操作时最高位清0
+    memcpy(&tx_buffer[1], buf, len);
     
     // 执行SPI传输
-    spi_bus_transfer_bytes(spi_device_handle, (uint8_t*)tx, NULL, len + 1);
+    spi_bus_transfer_bytes(spi_device_handle, tx_buffer, NULL, len + 1);
     
     return 0;
 }
