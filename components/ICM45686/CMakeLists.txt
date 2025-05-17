@@ -3,7 +3,7 @@ idf_component_register(
     SRCS 
         "src/inv_imu_driver.c"
         "src/inv_imu_transport.c"
-    
+        "src/inv_imu_driver_advanced.c"
     # include目录包含头文件
     INCLUDE_DIRS
         "include"

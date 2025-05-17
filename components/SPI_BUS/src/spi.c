@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "inv_imu_driver.h"
+#include "inv_imu_driver_advanced.h"
 #include "spi.h"
 #define INV_MSG(level,msg, ...) 	      printf("%d," msg "\r\n", __LINE__, ##__VA_ARGS__)
 
@@ -170,6 +171,13 @@ int setup_imu(int use_ln, int accel_en, int gyro_en)
 	rc |= inv_imu_set_config_int(&imu_dev, INV_IMU_INT1, &int_config);
 	SI_CHECK_RC(rc);
 
+#if INV_IMU_CLKIN_SUPPORTED
+	/* CLKIN configuration */
+	rc |= inv_imu_adv_set_int2_pin_usage(&imu_dev, IOC_PAD_SCENARIO_OVRD_INT2_CFG_OVRD_VAL_CLKIN);
+	rc |= inv_imu_adv_enable_clkin_rtc(&imu_dev);
+	SI_CHECK_RC(rc);
+#endif	
+
 	/* Set FSR */
 	rc |= inv_imu_set_accel_fsr(&imu_dev, ACCEL_CONFIG0_ACCEL_UI_FS_SEL_4_G);
 	rc |= inv_imu_set_gyro_fsr(&imu_dev, GYRO_CONFIG0_GYRO_UI_FS_SEL_1000_DPS);
@@ -212,7 +220,7 @@ int setup_imu(int use_ln, int accel_en, int gyro_en)
 
 	return rc;
 }
-int bsp_IcmGetRawData(float accel_mg[3], float gyro_dps[3], float *temp_degc)
+IRAM_ATTR int bsp_IcmGetRawData(float accel_mg[3], float gyro_dps[3], float *temp_degc)
 {
 	int rc = 0;
 	inv_imu_sensor_data_t d;
