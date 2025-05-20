@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <inttypes.h>
 #include <math.h>
 #include "sdkconfig.h"
@@ -105,28 +106,30 @@ void app_main(void)
     ledc_set_duty(CLK_IN_MODE, CLK_IN_CHANNEL, CLK_IN_DUTY);
     ledc_update_duty(CLK_IN_MODE, CLK_IN_CHANNEL);
 #endif
-
+    uint8_t CPU_RunInfo[400];
     while(1)
     {
         vTaskDelay(pdMS_TO_TICKS(1000));
+        memset(CPU_RunInfo, 0, 400); /* 信息缓冲区清零 */
+ 
+        vTaskList((char *)&CPU_RunInfo); //获取任务运行时间信息
+ 
+        printf("----------------------------------------------------\r\n");
+        printf("task_name     task_status     priority stack task_id\r\n");
+        printf("%s", CPU_RunInfo);
+        printf("----------------------------------------------------\r\n");
+ 
+        memset(CPU_RunInfo, 0, 400); /* 信息缓冲区清零 */
+ 
+        vTaskGetRunTimeStats((char *)&CPU_RunInfo);
+
+        printf("task_name       run_cnt                 usage_rate   \r\n");
+        printf("%s", CPU_RunInfo);
+        printf("----------------------------------------------------\r\n");
         // bsp_IcmGetRawData(accel_mg, gyro_dps,&temp_degc);
         // printf("accel_mg: %f %f %f\n", accel_mg[0], accel_mg[1], accel_mg[2]);
         // printf("gyro_dps: %f %f %f\n", gyro_dps[0], gyro_dps[1], gyro_dps[2]);
         // printf("temp_degc: %f\n", temp_degc);
-
-        // 获取 MahonyAHRS 计算出的四元数
-        float current_q0 = q0;
-        float current_q1 = q1;
-        float current_q2 = q2;
-        float current_q3 = q3;
-
-        // 将四元数转换为欧拉角
-        float roll, pitch, yaw;
-        QuatToEuler(current_q0, current_q1, current_q2, current_q3, &roll, &pitch, &yaw);
-
-        // 将弧度转换为度并打印
-        printf("Roll=%.2f, Pitch=%.2f, Yaw=%.2f\n", roll * 180.0f/M_PI, pitch * 180.0f/M_PI, yaw * 180.0f/M_PI);
-
 #ifdef IMU_TICK
         // printf("Time: %llu us\n", time);
 #endif
@@ -176,6 +179,12 @@ void IMU_IRQ_process(void *pvParameters)
 
                  // 调用 MahonyAHRS 更新函数 (根据头文件，不传入 dt)
                  MahonyAHRSupdateIMU(gx_rads, gy_rads, gz_rads, ax_g, ay_g, az_g);
+                // 将四元数转换为欧拉角
+                float roll, pitch, yaw;
+                QuatToEuler(q0, q1, q2, q3, &roll, &pitch, &yaw);
+
+                // 将弧度转换为度并打印
+                // printf("Roll=%.2f, Pitch=%.2f, Yaw=%.2f\n", roll * 180.0f/M_PI, pitch * 180.0f/M_PI, yaw * 180.0f/M_PI);
             }
 
             #ifdef IMU_TICK
