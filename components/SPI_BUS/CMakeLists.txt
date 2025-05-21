@@ -14,3 +14,4 @@ idf_component_register(
         spi_flash
         spi_bus
 )
+component_compile_options(-ffast-math -O3 -Wno-error=format=-Wno-format)

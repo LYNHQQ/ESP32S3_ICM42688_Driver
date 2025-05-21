@@ -7,9 +7,7 @@
 spi_bus_device_handle_t spi_device_handle = NULL;
 static inv_imu_device_t  imu_dev; /* Driver structure */
 
-#define SPI_BUFFER_SIZE 128
-static uint8_t tx_buffer[SPI_BUFFER_SIZE];
-static uint8_t rx_buffer[SPI_BUFFER_SIZE];
+#define SPI_BUFFER_SIZE 30
 
 int si_print_error_if_any(int rc);
 #define SI_CHECK_RC(rc)                                                                            \
@@ -70,8 +68,10 @@ static void init_spi(void)
 }
 
 // 修改读取函数
-static IRAM_ATTR int icm45686_read_regs(uint8_t reg, uint8_t* buf, uint32_t len)
+static int IRAM_ATTR icm45686_read_regs(uint8_t reg, uint8_t* buf, uint32_t len)
 {
+	static uint8_t tx_buffer[SPI_BUFFER_SIZE];
+	static uint8_t rx_buffer[SPI_BUFFER_SIZE];
     if (!buf || !len || (len + 1) > SPI_BUFFER_SIZE) {
 		printf("Error: Invalid buffer or length\n");
         return -1;
@@ -91,8 +91,9 @@ static IRAM_ATTR int icm45686_read_regs(uint8_t reg, uint8_t* buf, uint32_t len)
 }
 
 // 修改写入函数
-static IRAM_ATTR int icm45686_write_regs(uint8_t reg, const uint8_t* buf, uint32_t len)
+static int IRAM_ATTR icm45686_write_regs(uint8_t reg, const uint8_t* buf, uint32_t len)
 {
+	static uint8_t tx_buffer[SPI_BUFFER_SIZE];
     if (!buf || !len || (len + 1) > SPI_BUFFER_SIZE) {
 		printf("Error: Invalid buffer or length\n");
         return -1;
@@ -108,8 +109,38 @@ static IRAM_ATTR int icm45686_write_regs(uint8_t reg, const uint8_t* buf, uint32
     return 0;
 }
 
+//imu clk init
+#ifdef IMU_CLK_IN_PIN
+static void clk_in_init(void)
+{
+    // Prepare and then apply the LEDC PWM timer configuration
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode       = CLK_IN_MODE,
+        .duty_resolution  = CLK_IN_DUTY_RES,
+        .timer_num        = CLK_IN_TIMER,
+        .freq_hz          = CLK_IN_FREQUENCY,  // Set output frequency at 4 kHz
+        .clk_cfg          = LEDC_AUTO_CLK
+    };
+    ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+
+    // Prepare and then apply the LEDC PWM channel configuration
+    ledc_channel_config_t ledc_channel = {
+        .speed_mode     = CLK_IN_MODE,
+        .channel        = CLK_IN_CHANNEL,
+        .timer_sel      = CLK_IN_TIMER,
+        .intr_type      = LEDC_INTR_DISABLE,
+        .gpio_num       = IMU_CLK_IN_PIN,
+        .duty           = 0, // Set duty to 0%
+        .hpoint         = 0
+    };
+    ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+    ledc_set_duty(CLK_IN_MODE, CLK_IN_CHANNEL, CLK_IN_DUTY);
+    ledc_update_duty(CLK_IN_MODE, CLK_IN_CHANNEL);
+}
+#endif
+
 /* Initializes IMU device and apply configuration. */
-int setup_imu(int use_ln, int accel_en, int gyro_en)
+int setup_imu(int use_ln, int accel_en, int gyro_en, void (*IMU_IRQ_handler)(void *))
 {
 	int                      rc     = 0;
 	uint8_t                  whoami = 0;
@@ -171,21 +202,42 @@ int setup_imu(int use_ln, int accel_en, int gyro_en)
 	rc |= inv_imu_set_config_int(&imu_dev, INV_IMU_INT1, &int_config);
 	SI_CHECK_RC(rc);
 
+#ifdef IMU_INT_PINNUM
+	if(IMU_IRQ_handler != NULL)
+	{
+		// 配置中断输入引脚
+		gpio_set_direction(IMU_INT_PINNUM, GPIO_MODE_INPUT);
+		gpio_set_pull_mode(IMU_INT_PINNUM, GPIO_PULLUP_ONLY);
+		// 安装GPIO中断服务
+		gpio_install_isr_service(0);
+		// 注册中断处理函数
+		gpio_isr_handler_add(IMU_INT_PINNUM, IMU_IRQ_handler, NULL);
+		// 配置为下降沿触发中断
+		gpio_set_intr_type(IMU_INT_PINNUM, GPIO_INTR_POSEDGE);
+		// 配置中断触发方式
+		gpio_intr_enable(IMU_INT_PINNUM);
+	}
+#endif
+
+
 #if INV_IMU_CLKIN_SUPPORTED
 	/* CLKIN configuration */
 	rc |= inv_imu_adv_set_int2_pin_usage(&imu_dev, IOC_PAD_SCENARIO_OVRD_INT2_CFG_OVRD_VAL_CLKIN);
 	rc |= inv_imu_adv_enable_clkin_rtc(&imu_dev);
 	SI_CHECK_RC(rc);
+#ifdef IMU_CLK_IN_PIN
+	clk_in_init();
+#endif	
 #endif	
 
 	/* Set FSR */
-	rc |= inv_imu_set_accel_fsr(&imu_dev, ACCEL_CONFIG0_ACCEL_UI_FS_SEL_4_G);
-	rc |= inv_imu_set_gyro_fsr(&imu_dev, GYRO_CONFIG0_GYRO_UI_FS_SEL_1000_DPS);
+	rc |= inv_imu_set_accel_fsr(&imu_dev, ACCEL_CONFIG0_ACCEL_UI_FS_SEL_32_G);
+	rc |= inv_imu_set_gyro_fsr(&imu_dev, GYRO_CONFIG0_GYRO_UI_FS_SEL_4000_DPS);
 	SI_CHECK_RC(rc);
 
 	/* Set ODR */
-	rc |= inv_imu_set_accel_frequency(&imu_dev, ACCEL_CONFIG0_ACCEL_ODR_200_HZ);
-	rc |= inv_imu_set_gyro_frequency(&imu_dev, GYRO_CONFIG0_GYRO_ODR_200_HZ);
+	rc |= inv_imu_set_accel_frequency(&imu_dev, ACCEL_CONFIG0_ACCEL_ODR_6400_HZ);
+	rc |= inv_imu_set_gyro_frequency(&imu_dev, GYRO_CONFIG0_GYRO_ODR_6400_HZ);
 	SI_CHECK_RC(rc);
 
 	/* Set BW = ODR/4 */
@@ -217,10 +269,9 @@ int setup_imu(int use_ln, int accel_en, int gyro_en)
 //		discard_gyro_samples = (GYR_STARTUP_TIME_US / 20000) + 1;
 
 	SI_CHECK_RC(rc);
-
 	return rc;
 }
-IRAM_ATTR int bsp_IcmGetRawData(float accel_mg[3], float gyro_dps[3], float *temp_degc)
+int IRAM_ATTR bsp_IcmGetRawData(float accel_mg[3], float gyro_dps[3], float *temp_degc)
 {
 	int rc = 0;
 	inv_imu_sensor_data_t d;
@@ -228,12 +279,12 @@ IRAM_ATTR int bsp_IcmGetRawData(float accel_mg[3], float gyro_dps[3], float *tem
 	rc |= inv_imu_get_register_data(&imu_dev, &d);
 	SI_CHECK_RC(rc);
 	
-	accel_mg[0] = (float)(d.accel_data[0] * 4 /* mg */) / 32.768;
-	accel_mg[1] = (float)(d.accel_data[1] * 4 /* mg */) / 32.768;
-	accel_mg[2] = (float)(d.accel_data[2] * 4 /* mg */) / 32.768;
-	gyro_dps[0] = (float)(d.gyro_data[0] * 1000 /* dps */) / 32768.0;
-	gyro_dps[1] = (float)(d.gyro_data[1] * 1000 /* dps */) / 32768.0;
-	gyro_dps[2] = (float)(d.gyro_data[2] * 1000 /* dps */) / 32768.0;
+	accel_mg[0] = (float)(d.accel_data[0] * 16 /* mg */) / 32.768;
+	accel_mg[1] = (float)(d.accel_data[1] * 16 /* mg */) / 32.768;
+	accel_mg[2] = (float)(d.accel_data[2] * 16 /* mg */) / 32.768;
+	gyro_dps[0] = (float)(d.gyro_data[0] * 4000 /* dps */) / 32768.0;
+	gyro_dps[1] = (float)(d.gyro_data[1] * 4000 /* dps */) / 32768.0;
+	gyro_dps[2] = (float)(d.gyro_data[2] * 4000 /* dps */) / 32768.0;
 	*temp_degc  = (float)25 + ((float)d.temp_data / 128);
 	return 0;
 }

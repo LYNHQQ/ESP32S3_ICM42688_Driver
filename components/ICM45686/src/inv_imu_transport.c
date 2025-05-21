@@ -117,7 +117,7 @@ static int read_mreg(inv_imu_transport_t *t, uint32_t reg, uint32_t len, uint8_t
 	/* Write address first */
 	data[0] = (reg & 0xFF00) >> 8;
 	data[1] = reg & 0xFF;
-	t->sleep_us(4);
+	// t->sleep_us(4);
 	status |= write_dreg(t, IREG_ADDR_15_8, 2, data);
 
 	if (status)
@@ -125,7 +125,7 @@ static int read_mreg(inv_imu_transport_t *t, uint32_t reg, uint32_t len, uint8_t
 
 	/* Read all bytes one by one */
 	for (uint32_t i = 0; i < len; i++) {
-		t->sleep_us(4);
+		// t->sleep_us(4);
 		status |= read_dreg(t, IREG_DATA, 1, &buf[i]);
 	}
 
@@ -148,9 +148,9 @@ static int write_mreg(inv_imu_transport_t *t, uint32_t reg, uint32_t len, const 
 	data[2] = buf[0];
 
 	/* Burst write address and first byte */
-	t->sleep_us(4);
+	// t->sleep_us(4);
 	status |= write_dreg(t, IREG_ADDR_15_8, 3, data);
-	t->sleep_us(4);
+	// t->sleep_us(4);
 
 	if (status)
 		return status;
@@ -158,7 +158,7 @@ static int write_mreg(inv_imu_transport_t *t, uint32_t reg, uint32_t len, const 
 	/* Loop on the remaining bytes */
 	for (uint32_t i = 1; i < len; i++) {
 		status |= write_dreg(t, IREG_DATA, 1, &buf[i]);
-		t->sleep_us(4);
+		// t->sleep_us(4);
 	}
 
 	return status;
